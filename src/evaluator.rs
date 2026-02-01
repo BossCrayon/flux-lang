@@ -26,6 +26,15 @@ fn eval_statement(stmt: &Statement, env: &mut Environment) -> Object {
             env.set(name.clone(), val);
             Object::Null
         },
+        // NEW: Handle Assignment
+        Statement::Assign { name, value } => {
+            let val = eval(value, env);
+            if is_error(&val) { return val; }
+            // Note: We currently just overwrite. 
+            // A safer language would check if 'name' exists first!
+            env.set(name.clone(), val); 
+            Object::Null
+        },
         _ => Object::Null,
     }
 }
@@ -207,6 +216,7 @@ fn eval_prefix(op: &str, right: Object) -> Object {
 
 fn eval_infix(op: &str, left: Object, right: Object) -> Object {
     match (left, right) {
+        // 1. Integer Math
         (Object::Integer(l), Object::Integer(r)) => match op {
             "+" => Object::Integer(l + r),
             "-" => Object::Integer(l - r),
@@ -218,25 +228,56 @@ fn eval_infix(op: &str, left: Object, right: Object) -> Object {
             "!=" => Object::Boolean(l != r),
             _ => Object::Error(format!("Unknown op: {}", op)),
         },
+        
+        // 2. Boolean Logic
+        (Object::Boolean(l), Object::Boolean(r)) => match op {
+            "==" => Object::Boolean(l == r),
+            "!=" => Object::Boolean(l != r),
+            _ => Object::Error("Unknown op".to_string()),
+        },
+        
+        // 3. String Concatenation (String + String)
         (Object::String(l), Object::String(r)) => match op {
             "+" => Object::String(format!("{}{}", l, r)),
             "==" => Object::Boolean(l == r),
             "!=" => Object::Boolean(l != r),
             _ => Object::Error("Unknown string op".to_string()),
         },
+
+        // 4. String Mixed (String + Int)
         (Object::String(l), Object::Integer(r)) => match op {
-             "+" => Object::String(format!("{}{}", l, r)),
-             _ => Object::Error("Type mismatch".to_string()),
+            "+" => Object::String(format!("{}{}", l, r)),
+            _ => Object::Error("Type mismatch".to_string()),
         },
         (Object::Integer(l), Object::String(r)) => match op {
-             "+" => Object::String(format!("{}{}", l, r)),
-             _ => Object::Error("Type mismatch".to_string()),
+            "+" => Object::String(format!("{}{}", l, r)),
+            _ => Object::Error("Type mismatch".to_string()),
         },
-        (Object::Boolean(l), Object::Boolean(r)) => match op {
-            "==" => Object::Boolean(l == r),
-            "!=" => Object::Boolean(l != r),
-            _ => Object::Error("Unknown op".to_string()),
+
+        // 5. NEW: String + Array (Fixes your error)
+        (Object::String(l), Object::Array(r)) => match op {
+            "+" => {
+                // We use the Display impl of Object::Array to turn it into text
+                let arr_str = Object::Array(r).to_string(); 
+                Object::String(format!("{}{}", l, arr_str))
+            },
+            _ => Object::Error("Type mismatch".to_string()),
         },
+
+        // 6. Array Operations (Array + Array)
+        (Object::Array(l), Object::Array(r)) => match op {
+            "+" => {
+                let mut new_vec = l.clone();
+                new_vec.extend(r);
+                Object::Array(new_vec)
+            },
+            _ => Object::Error("Unknown array operator".to_string()),
+        },
+
+        (Object::String(l), Object::Null) => {
+             Object::String(format!("{}null", l))
+        },
+
         _ => Object::Error("Type mismatch".to_string()),
     }
 }

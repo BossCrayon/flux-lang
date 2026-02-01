@@ -52,8 +52,32 @@ impl Parser {
         match self.cur_token.token_type {
             TokenType::Mut => self.parse_let_statement(),
             TokenType::Return => self.parse_return_statement(),
+            // NEW: Check for Assignment (Identifier followed by =)
+            TokenType::Identifier => {
+                if self.peek_token.token_type == TokenType::Assign {
+                    return self.parse_assignment_statement();
+                }
+                self.parse_expression_statement()
+            },
             _ => self.parse_expression_statement(),
         }
+    }
+
+    // NEW FUNCTION
+    fn parse_assignment_statement(&mut self) -> Option<Statement> {
+        // We are currently on the Identifier
+        let name = self.cur_token.literal.clone();
+        
+        self.next_token(); // Move to '='
+        self.next_token(); // Move to Value
+
+        let value = self.parse_expression(Precedence::Lowest)?;
+
+        if self.peek_token.token_type == TokenType::Semicolon {
+            self.next_token();
+        }
+
+        Some(Statement::Assign { name, value })
     }
 
     fn parse_let_statement(&mut self) -> Option<Statement> {

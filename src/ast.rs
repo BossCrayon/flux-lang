@@ -8,6 +8,7 @@ pub struct BlockStatement {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let { name: String, value: Expression },
+    Assign { name: String, value: Expression }, 
     Return(Expression),
     Expression(Expression),
     Function { name: String, parameters: Vec<String>, body: BlockStatement },
