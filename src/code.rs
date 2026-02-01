@@ -16,6 +16,8 @@ pub const OP_NOT_EQUAL: Opcode = 6;
 pub const OP_GREATER_THAN: Opcode = 7;
 pub const OP_JUMP_NOT_TRUTHY: Opcode = 8;
 pub const OP_JUMP: Opcode = 9;
+pub const OP_GET_GLOBAL: Opcode = 10;
+pub const OP_SET_GLOBAL: Opcode = 11;
 // 2. Definition Struct (Helper to understand operands)
 // e.g., OP_CONSTANT needs 2 extra bytes to store the index of the constant.
 pub struct Definition {
@@ -36,6 +38,8 @@ pub fn lookup(op: u8) -> Option<Definition> {
         OP_GREATER_THAN => Some(Definition { name: "OpGreaterThan".to_string(), operand_widths: vec![] }),
         OP_JUMP_NOT_TRUTHY => Some(Definition { name: "OpJumpNotTruthy".to_string(), operand_widths: vec![2] }),
         OP_JUMP            => Some(Definition { name: "OpJump".to_string(), operand_widths: vec![2] }),
+        OP_GET_GLOBAL => Some(Definition { name: "OpGetGlobal".to_string(), operand_widths: vec![2] }),
+        OP_SET_GLOBAL => Some(Definition { name: "OpSetGlobal".to_string(), operand_widths: vec![2] }),
         _ => None,
     }
 }

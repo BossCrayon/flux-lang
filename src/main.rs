@@ -9,6 +9,7 @@ mod builtins;
 mod code;
 mod compiler; 
 mod vm;
+mod symbol_table;
 
 use std::env;
 use std::fs;
@@ -27,8 +28,7 @@ fn main() {
     // --- VM DEBUG START ---
     println!("--- VM DEBUG ---");
     
-    // 1. Create a fake program: "1 + 2"
-    let input = "if (true) { 10 } else { 20 }";
+    let input = "mut x = 50; mut y = 10; x + y";
     let l = Lexer::new(input.to_string());
     let mut p = Parser::new(l);
     let program = p.parse_program();

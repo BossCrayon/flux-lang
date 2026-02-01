@@ -1,12 +1,14 @@
 use crate::ast;
 use crate::code;
 use crate::object::Object;
+use crate::symbol_table::SymbolTable;
 
 pub struct Compiler {
     pub instructions: code::Instructions,
     pub constants: Vec<Object>,
+    pub symbol_table: SymbolTable,
     
-    // Tracking for "pop" removal (to make blocks return values)
+    // Tracking for "pop" removal (to make blocks return values like expressions)
     last_instruction: Option<EmittedInstruction>,
     previous_instruction: Option<EmittedInstruction>,
 }
@@ -22,6 +24,7 @@ impl Compiler {
         Compiler {
             instructions: vec![],
             constants: vec![],
+            symbol_table: SymbolTable::new(),
             last_instruction: None,
             previous_instruction: None,
         }
@@ -36,11 +39,19 @@ impl Compiler {
 
     fn compile_statement(&mut self, stmt: ast::Statement) -> Result<(), String> {
         match stmt {
+            ast::Statement::Let { name, value } => {
+                // 1. Compile value (pushes result to stack)
+                self.compile_expression(value)?;
+                // 2. Define symbol and get index
+                let symbol = self.symbol_table.define(name);
+                // 3. Emit SetGlobal
+                self.emit(code::OP_SET_GLOBAL, vec![symbol.index]);
+            },
             ast::Statement::Expression(exp) => {
                 self.compile_expression(exp)?;
-               // self.emit(code::OP_POP, vec![]); 
+                // Statement expressions pop their result to keep stack clean
+                //self.emit(code::OP_POP, vec![]); 
             },
-            // We'll add Let/Return here later
             _ => return Err("Statement type not implemented yet".to_string()),
         }
         Ok(())
@@ -49,7 +60,7 @@ impl Compiler {
     fn compile_expression(&mut self, exp: ast::Expression) -> Result<(), String> {
         match exp {
             ast::Expression::Infix { left, operator, right } => {
-                // Rewire LessThan (<) to GreaterThan (>)
+                // Special Case: Swap < to >
                 if operator == "<" {
                     self.compile_expression(*right)?;
                     self.compile_expression(*left)?;
@@ -76,42 +87,42 @@ impl Compiler {
             ast::Expression::Boolean(true)  => { self.emit(code::OP_TRUE, vec![]); },
             ast::Expression::Boolean(false) => { self.emit(code::OP_FALSE, vec![]); },
             
-            // --- IF / ELSE LOGIC ---
+            // --- VARIABLES ---
+            ast::Expression::Identifier(name) => {
+                if let Some(symbol) = self.symbol_table.resolve(&name) {
+                    self.emit(code::OP_GET_GLOBAL, vec![symbol.index]);
+                } else {
+                    return Err(format!("Undefined variable: {}", name));
+                }
+            },
+
+            // --- IF / ELSE ---
             ast::Expression::If { condition, consequence, alternative } => {
-                // 1. Compile Condition
                 self.compile_expression(*condition)?;
 
-                // 2. Emit JumpNotTruthy with dummy 9999
+                // Emit JumpNotTruthy with dummy 9999
                 let jump_not_truthy_pos = self.emit(code::OP_JUMP_NOT_TRUTHY, vec![9999]);
 
-                // 3. Compile Consequence
                 self.compile_block(consequence)?;
-                
-                // If the block ended with a Pop, remove it so the value stays on stack
-                if self.last_instruction_is_pop() {
-                    self.remove_last_pop();
-                }
+                if self.last_instruction_is_pop() { self.remove_last_pop(); }
 
-                // 4. Emit Jump (to skip else) with dummy 9999
+                // Emit Jump with dummy 9999
                 let jump_pos = self.emit(code::OP_JUMP, vec![9999]);
 
-                // 5. PATCH JumpNotTruthy: Make it jump to HERE (after consequence)
+                // Patch NotTruthy
                 let after_consequence_pos = self.instructions.len();
                 self.change_operand(jump_not_truthy_pos, after_consequence_pos);
 
-                // 6. Compile Alternative (Else)
                 if let Some(alt) = alternative {
                     self.compile_block(alt)?;
-                    if self.last_instruction_is_pop() {
-                        self.remove_last_pop();
-                    }
+                    if self.last_instruction_is_pop() { self.remove_last_pop(); }
                 } else {
-                    // If no else, return Null
+                    // Else-less ifs return Null
                     let null_idx = self.add_constant(Object::Null);
                     self.emit(code::OP_CONSTANT, vec![null_idx]);
                 }
 
-                // 7. PATCH Jump: Make it jump to HERE (end of everything)
+                // Patch Jump
                 let after_alternative_pos = self.instructions.len();
                 self.change_operand(jump_pos, after_alternative_pos);
             },
@@ -127,7 +138,7 @@ impl Compiler {
         Ok(())
     }
 
-    // --- Helpers ---
+    // --- HELPERS ---
 
     pub fn add_constant(&mut self, obj: Object) -> usize {
         self.constants.push(obj);
@@ -139,24 +150,20 @@ impl Compiler {
         let pos = self.instructions.len();
         self.instructions.extend(ins);
         
-        // Track instruction for Pop removal
         self.previous_instruction = self.last_instruction;
         self.last_instruction = Some(EmittedInstruction { opcode: op, position: pos });
         
         pos
     }
 
-    // Back-Patching: Overwrite an operand at a specific position
     fn change_operand(&mut self, op_pos: usize, operand: usize) {
         let op = self.instructions[op_pos];
         let new_instruction = code::make(op, vec![operand]);
-        
         for (i, byte) in new_instruction.iter().enumerate() {
             self.instructions[op_pos + i] = *byte;
         }
     }
 
-    // Check if the last thing we wrote was "Pop"
     fn last_instruction_is_pop(&self) -> bool {
         match self.last_instruction {
             Some(ins) => ins.opcode == code::OP_POP,
@@ -164,7 +171,6 @@ impl Compiler {
         }
     }
 
-    // Undo the last "Pop" (physically remove bytes from vector)
     fn remove_last_pop(&mut self) {
         if let Some(ins) = self.last_instruction {
             self.instructions.truncate(ins.position);
