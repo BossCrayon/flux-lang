@@ -3,66 +3,48 @@ mod lexer;
 mod ast;
 mod parser;
 mod object;
-mod evaluator;
 mod environment;
+mod evaluator;
 mod builtins;
-mod repl;
 
 use std::env;
 use std::fs;
-use lexer::Lexer;
-use parser::Parser;
-use evaluator::eval_program;
-use environment::Environment;
+use crate::lexer::Lexer;
+use crate::parser::Parser;
+use crate::environment::Environment;
+use crate::evaluator::eval_program;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-
-    if args.len() > 1 {
-        // Mode 1: Run a File
-        let filename = &args[1];
-        run_file(filename);
-    } else {
-        // Mode 2: Interactive Shell
-        repl::start();
+    if args.len() < 2 {
+        println!("Usage: flux_compiler [filename.flux]");
+        return;
     }
+    run_file(&args[1]);
 }
 
 fn run_file(filename: &str) {
-    // 1. Read file
     let contents = match fs::read_to_string(filename) {
         Ok(c) => c,
-        Err(_) => {
-            println!("Error: Could not read file '{}'", filename);
-            return;
-        }
+        Err(_) => { println!("Error reading file"); return; }
     };
-
-    // 2. Setup Env
-    let mut env = Environment::new();
-    let tools = builtins::new_environment();
-    for (name, tool) in tools {
-        env.set(name, tool);
-    }
-
-    // 3. Compile
+    
     let l = Lexer::new(contents);
     let mut p = Parser::new(l);
     let program = p.parse_program();
 
     if !p.errors.is_empty() {
         println!("Parser Errors:");
-        for msg in p.errors {
-            println!("\t{}", msg);
-        }
+        for msg in p.errors { println!("\t{}", msg); }
         return;
     }
 
-    // 4. Run & PRINT THE RESULT
-    let result = eval_program(&program, &mut env);
+    let mut env = Environment::new();
+    let tools = builtins::new_environment();
+    for (name, tool) in tools { env.set(name, tool); }
     
-    // The Fix: If the result isn't "Null" (empty), print it!
-    if result != object::Object::Null {
+    let result = eval_program(&program, &mut env);
+    if result != crate::object::Object::Null {
         println!("{}", result);
     }
 }

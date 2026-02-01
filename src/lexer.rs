@@ -69,9 +69,13 @@ impl Lexer {
                     self.read_char();
                     self.new_token(TokenType::NotEq, "!=")
                 } else {
-                    self.new_token(TokenType::Illegal, "!")
+                    // FIX: Return Bang instead of Illegal
+                    self.new_token(TokenType::Bang, "!") 
                 }
             },
+            // FIX: Add Semicolon handler
+            ';' => self.new_token(TokenType::Semicolon, ";"), 
+            
             '"' => {
                 let str_lit = self.read_string();
                 self.new_token(TokenType::String, &str_lit)
