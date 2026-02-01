@@ -40,6 +40,13 @@ impl Lexer {
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
+        // v2.0 UPGRADE: Comment Skipping
+        // If we see '//', we consume characters until the line ends
+        if self.ch == '/' && self.peek_char() == '/' {
+            self.skip_comment();
+            return self.next_token();
+        }
+
         if is_letter(self.ch) {
             let literal = self.read_identifier();
             let token_type = lookup_ident(&literal);
@@ -66,7 +73,6 @@ impl Lexer {
                     self.new_token(TokenType::Illegal, "!")
                 }
             },
-            // NEW: String Support
             '"' => {
                 let str_lit = self.read_string();
                 self.new_token(TokenType::String, &str_lit)
@@ -93,14 +99,19 @@ impl Lexer {
         tok
     }
 
-    // NEW: Reads until it hits another quote
+    fn skip_comment(&mut self) {
+        // Keep reading until newline or end of file
+        while self.ch != '\n' && self.ch != '\0' {
+            self.read_char();
+        }
+        self.skip_whitespace();
+    }
+
     fn read_string(&mut self) -> String {
-        let pos = self.position + 1; // skip the opening quote
+        let pos = self.position + 1; 
         loop {
             self.read_char();
-            if self.ch == '"' || self.ch == '\0' {
-                break;
-            }
+            if self.ch == '"' || self.ch == '\0' { break; }
         }
         self.input[pos..self.position].iter().collect()
     }
@@ -126,13 +137,8 @@ impl Lexer {
     }
 }
 
-fn is_letter(ch: char) -> bool {
-    ch.is_alphabetic() || ch == '_'
-}
-
-fn is_digit(ch: char) -> bool {
-    ch.is_numeric()
-}
+fn is_letter(ch: char) -> bool { ch.is_alphabetic() || ch == '_' }
+fn is_digit(ch: char) -> bool { ch.is_numeric() }
 
 fn lookup_ident(ident: &str) -> TokenType {
     match ident {
