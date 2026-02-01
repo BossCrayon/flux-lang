@@ -141,7 +141,7 @@ fn apply_function(func: Object, args: Vec<Object>) -> Object {
 
 fn eval_block(block: &BlockStatement, env: &mut Environment) -> Object { let mut r = Object::Null; for s in &block.statements { r = eval_statement(s, env); if let Object::Return(_) = r { return r; } if let Object::Error(_) = r { return r; } } r }
 
-ffn eval_infix(op: &str, left: Object, right: Object) -> Object {
+fn eval_infix(op: &str, left: Object, right: Object) -> Object {
     match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => match op {
             "+" => Object::Integer(l + r),
