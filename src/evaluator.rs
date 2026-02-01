@@ -141,7 +141,7 @@ fn apply_function(func: Object, args: Vec<Object>) -> Object {
 
 fn eval_block(block: &BlockStatement, env: &mut Environment) -> Object { let mut r = Object::Null; for s in &block.statements { r = eval_statement(s, env); if let Object::Return(_) = r { return r; } if let Object::Error(_) = r { return r; } } r }
 
-fn eval_infix(op: &str, left: Object, right: Object) -> Object {
+ffn eval_infix(op: &str, left: Object, right: Object) -> Object {
     match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => match op {
             "+" => Object::Integer(l + r),
@@ -159,15 +159,22 @@ fn eval_infix(op: &str, left: Object, right: Object) -> Object {
             "!=" => Object::Boolean(l != r),
             _ => Object::Error("Unknown op".to_string()),
         },
-        
-        // NEW: String Concatenation
         (Object::String(l), Object::String(r)) => match op {
             "+" => Object::String(format!("{}{}", l, r)),
             "==" => Object::Boolean(l == r),
             "!=" => Object::Boolean(l != r),
             _ => Object::Error("Unknown string op".to_string()),
         },
-        
+        // NEW: Allow String + Integer
+        (Object::String(l), Object::Integer(r)) => match op {
+            "+" => Object::String(format!("{}{}", l, r)),
+            _ => Object::Error("Type mismatch".to_string()),
+        },
+        // NEW: Allow Integer + String
+        (Object::Integer(l), Object::String(r)) => match op {
+            "+" => Object::String(format!("{}{}", l, r)),
+            _ => Object::Error("Type mismatch".to_string()),
+        },
         _ => Object::Error("Type mismatch".to_string()),
     }
 }

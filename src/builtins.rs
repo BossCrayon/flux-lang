@@ -71,7 +71,7 @@ fn read_file_fn(args: Vec<Object>) -> Object {
     if let Object::String(path) = &args[0] {
         match fs::read_to_string(path) {
             Ok(content) => Object::String(content),
-            Err(_) => Object::Error(format!("File not found: {}", path)),
+            Err(_) => Object::String("".to_string()), 
         }
     } else {
         Object::Error("Argument must be a string path".to_string())

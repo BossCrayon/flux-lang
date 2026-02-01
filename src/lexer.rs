@@ -40,8 +40,7 @@ impl Lexer {
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
-        // v2.0 UPGRADE: Comment Skipping
-        // If we see '//', we consume characters until the line ends
+        // Comment Skipping
         if self.ch == '/' && self.peek_char() == '/' {
             self.skip_comment();
             return self.next_token();
@@ -100,7 +99,6 @@ impl Lexer {
     }
 
     fn skip_comment(&mut self) {
-        // Keep reading until newline or end of file
         while self.ch != '\n' && self.ch != '\0' {
             self.read_char();
         }
@@ -120,9 +118,13 @@ impl Lexer {
         Token { token_type, literal: literal.to_string() }
     }
 
+    // CRITICAL FIX: Allow digits inside identifiers
     fn read_identifier(&mut self) -> String {
         let pos = self.position;
-        while is_letter(self.ch) { self.read_char(); }
+        // We accept letters OR digits (e.g., 'n1', 'var2')
+        while is_letter(self.ch) || is_digit(self.ch) { 
+            self.read_char(); 
+        }
         self.input[pos..self.position].iter().collect()
     }
 
